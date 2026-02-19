@@ -17,7 +17,18 @@ test()
 
 
 async function test(){
-    const res = await fetch('http://127.0.0.1:27015');
+    const mockData = {
+        smth2: 'test235626',
+        val: '300',
+        o: {t: "tt", h: "h1h1"}
+    };
+    const res = await fetch('http://127.0.0.1:27015/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(mockData)
+    });
     const text = await res.text()
     console.log(text);
 }

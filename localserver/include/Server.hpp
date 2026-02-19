@@ -1,6 +1,7 @@
 #include<string>
 #include<unordered_map>
 #include<functional>
+#include<cstdint>
 
 #include<WinSock2.h>
 
@@ -14,9 +15,11 @@ public:
 
     std::string GetMethod() const { return method; }
     std::string GetPath() const { return path; }
+    std::string GetBody() const { return body; }
 private:
     std::string method = "";
     std::string path = "";
+    std::string body = "";
     std::string fullRequest = "";
 };
 
@@ -24,8 +27,16 @@ class Response {
 public:
     Response() = default;
 
+    void BuildRes(
+        const std::string& cors = "BLOCK",
+        const std::string& type = "text/plain",
+        const std::string& body = "internal server error",
+        const uint16_t status = 500
+    );
+
     std::string GetFullResponse();
 
+    void SetHeader(const std::string& name, const std::string& val);
     void SetCors(const std::string& _cors);
     void SetStatus(const uint16_t _status);
     void SetContent(const std::string& _body, const std::string& _type);
@@ -35,6 +46,7 @@ private:
     std::string type = "text/plain";
     std::string body = "internal server error";
     uint16_t status = 500;
+    std::unordered_map<std::string, std::string> headers;
 };
 
 class Server {
@@ -67,6 +79,7 @@ private:
     bool HandleConnection();
     void HandleRequest();
     void ParseRequest();
+    void SendCorsRes();
     const char* BuildResponse(
         const char* body,
         const char* status,

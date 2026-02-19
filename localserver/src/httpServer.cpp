@@ -23,6 +23,32 @@ void Request::Parse(const char* req){
         size_t pathEnd = fullRequest.find(' ', pathStart);
         if(pathEnd != std::string::npos){
             path = fullRequest.substr(pathStart, pathEnd - pathStart);
+
+            size_t lineEnd = fullRequest.find("\r\n", pathEnd);
+
+            if(lineEnd != std::string::npos){
+                size_t headerStart = lineEnd + 2;
+                size_t headerEnd = fullRequest.find("\r\n\r\n", headerStart);
+
+                if(headerEnd != std::string::npos){
+                    std::string headers = fullRequest.substr(headerStart, headerEnd - headerStart);
+
+                    size_t contentLengthPos = headers.find("Content-Length: ");
+                    if(contentLengthPos != std::string::npos){
+                        contentLengthPos += 16;
+                        size_t contentLenghtEnd = headers.find("\r\n", contentLengthPos);
+                        std::string contentLenghtStr = headers.substr(contentLengthPos, contentLenghtEnd - contentLengthPos);
+                        int contentLength = std::stoi(contentLenghtStr);
+
+                        if(contentLength > 0){
+                            size_t bodyStart = headerEnd + 4;
+                            if(bodyStart + contentLength <= fullRequest.length()){
+                                body = fullRequest.substr(bodyStart, contentLength);
+                            }
+                        }
+                    }
+                }
+            }
         }
         else{
             path = fullRequest.substr(pathStart);
@@ -32,23 +58,43 @@ void Request::Parse(const char* req){
         method = fullRequest;
     }
 
-    std::cout << "method: " << method << "\npath: " << path << std::endl;
+    std::cout << "method: " << method << "\npath: " << path << "\nbody\n{" << body << "\n}\n" << std::endl;
 }
 
-
+void Response::BuildRes(
+    const std::string& cors,
+    const std::string& type,
+    const std::string& body,
+    const uint16_t status
+){
+    SetCors(cors);
+    SetContent(body, type);
+    SetStatus(status);
+}
 
 std::string Response::GetFullResponse(){
-    const size_t bodyLen = body.length();
-    const std::string fullRes = 
-        "HTTP/1.1 " + std::to_string(status) + "\r\n" +
-        "Content-Type: " + type + "\r\n" +
-        "Access-Control-Allow-Origin: " + cors + "\r\n" +
-        "Content-Length: " + std::to_string(bodyLen) + "\r\n" +
-        "Connection: close\r\n" +
-        "\r\n" +
-        body;
+    std::string statusText;
+    switch(status) {
+        case 200: statusText = "OK"; break;
+        case 201: statusText = "Created"; break;
+        case 204: statusText = "No Content"; break;
+        case 400: statusText = "Bad Request"; break;
+        case 404: statusText = "Not Found"; break;
+        case 500: statusText = "Internal Server Error"; break;
+        default: statusText = "Unknown"; break;
+    }
 
+    headers["Content-Length"] = std::to_string(body.length());
+    std::string fullRes = "HTTP/1.1 " + std::to_string(status) + " " + statusText + "\r\n";
+    for(const auto& [key,val] : headers){
+        fullRes += key + ": " + val + "\r\n";
+    }
+    fullRes += "\r\n" + body;
     return fullRes;
+}
+
+void Response::SetHeader(const std::string& name, const std::string& val){
+    headers[name] = val;
 }
 
 void Response::SetCors(const std::string& _cors){
@@ -161,13 +207,26 @@ bool Server::HandleConnection(){
 }
 
 void Server::HandleRequest(){
-    if(req.GetMethod() == "POST"){
+    const std::string& reqMethod = req.GetMethod();
+    if(reqMethod == "OPTIONS"){
+        res.SetHeader("Access-Control-Allow-Origin", "http://localhost:5000");
+        res.SetHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.SetHeader("Access-Control-Allow-Headers", "Content-Type");
+        res.SetHeader("Access-Control-Max-Age", "86400");
+        res.SetContent("", "text/plain");
+        res.SetStatus(204);
+    }
+    else if(reqMethod == "POST"){
         std::cout << "--d--d-d-d-d-dd--d-dd--dd---d\n";
         auto it = postHandlers.find(req.GetPath());
         if(it != postHandlers.end()){
             it->second();
         }
     }
+}
+
+void Server::SendCorsRes(){
+
 }
 
 const char* Server::BuildResponse(
@@ -201,37 +260,49 @@ void Server::Post(const std::string& path, std::function<void()> handler){
 }
 
 #include<fstream>
-#include"sys/stat.h"
+#include<filesystem>
 
 using namespace filesys;
-bool FileSystem::Save(const std::string& jsonContent){
-    const std::string targetDir = "../../editor";
-    const std::string targetFile = targetDir + "/savefile.json";
 
-    DWORD attrib = GetFileAttributesA(targetDir.c_str());
-    if(attrib == INVALID_FILE_ATTRIBUTES){
-        std::cout << "Directory '" << targetDir << " does not exist!" << std::endl;
+bool FileSystem::Save(const std::string& jsonContent) {
+    char buffer[MAX_PATH];
+    if (GetModuleFileNameA(NULL, buffer, MAX_PATH) == 0) {
+        std::cout << "Failed to retrieve the executable path." << std::endl;
         return false;
     }
-    if(!(attrib & FILE_ATTRIBUTE_DIRECTORY)){
-        std::cout << targetDir << " is not a directory!" << std::endl;
+    
+    std::filesystem::path exePath = buffer;
+    std::filesystem::path exeDir = exePath.parent_path();
+    
+    std::filesystem::path targetDir = (exeDir / "../../editor").lexically_normal();
+    std::filesystem::path targetFile = targetDir / "savefile.json";
+
+    if (!std::filesystem::exists(targetDir)) {
+        std::cout << "Directory '" << targetDir.string() << "' does not exist!" << std::endl;
+        return false;
+    }
+    if (!std::filesystem::is_directory(targetDir)) {
+        std::cout << targetDir.string() << " is not a directory!" << std::endl;
         return false;
     }
 
     std::ofstream outFile(targetFile, std::ios::binary);
-    if(!outFile.is_open()){
-        std::cout << "Could not open/create " << targetFile << " for writting." << std::endl;
+    if (!outFile.is_open()) {
+        std::cout << "Could not open/create " << targetFile.string() << " for writing." << std::endl;
         return false;
     }
+
     outFile.write(jsonContent.c_str(), jsonContent.size());
+    
+    bool writeFailed = outFile.fail();
     outFile.close();
 
-    if(outFile.fail()){
-        std::cout << "Failed to write JSON content to file";
+    if (writeFailed || outFile.fail()) {
+        std::cout << "Failed to write JSON content to file!" << std::endl;
         return false;
     }
 
-    std::cout << "JSON file succesfully saved to: " << targetFile << std::endl;
+    std::cout << "JSON file successfully saved to: " << targetFile.string() << std::endl;
     return true;
 }
 
