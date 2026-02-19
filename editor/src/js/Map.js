@@ -58,7 +58,10 @@ class Map {
     }
 
     exportMap(){
-        
+        return {
+            name: 'map name',
+            tiles: this.tiles
+        };
     }
 
     setSize(widthInTiles, heightInTiles){
