@@ -18,6 +18,7 @@ class Map {
         }
 
         this.toolbox = new Tools;
+        this.mousedrag = false;
 
         this.init(ctxID);
     }
@@ -30,24 +31,22 @@ class Map {
         }
         this.handle = tempHandle;
         this.ctx = tempHandle.getContext('2d');
-
+        
+        this.handle.addEventListener('mousedown', e => {
+            this.mousedrag = true;
+        });
+        this.handle.addEventListener('mouseup', e => {
+            this.mousedrag = false;
+        });
+        this.handle.addEventListener('mouseleave', e => {
+            this.mousedrag = false;
+        });
         this.handle.addEventListener('mousemove', e => {
-            const pos = this.getGridPos(e);
-            if(pos.x >= this.map.widthInTiles * this.tileSize || pos.y >= this.map.heightInTiles * this.tileSize) return;
-            this.hover.x = pos.x;
-            this.hover.y = pos.y;
-            //console.log(`x: ${this.hover.x}, y: ${this.hover.y}`)
+            this.updateSelection(e);
+            if(this.mousedrag && this.toolbox.activeTool == 'Brush') this.placeTile();
         });
         this.handle.addEventListener('click', e => {
-            if(this.map.tilesetUsed){
-                const targetRow = Math.round(this.hover.y / this.tileSize);
-                const targetTile = Math.round(this.hover.x / this.tileSize);
-                const tilesetPos = this.toolbox.activeTool == 'Erase' 
-                    ? { x: -1, y: -1 } : this.map.tilesetUsed.getSelectedPos();
-                    
-                this.tiles[targetRow][targetTile][0] = tilesetPos.x;
-                this.tiles[targetRow][targetTile][1] = tilesetPos.y;
-            }
+            this.placeTile();
         });
     }
 
@@ -73,6 +72,25 @@ class Map {
             newTiles.push(newRow);
         }
         this.tiles = newTiles;
+    }
+
+    placeTile(){
+        if(this.map.tilesetUsed){
+            const targetRow = Math.round(this.hover.y / this.tileSize);
+            const targetTile = Math.round(this.hover.x / this.tileSize);
+            const tilesetPos = this.toolbox.activeTool == 'Erase' 
+                ? { x: -1, y: -1 } : this.map.tilesetUsed.getSelectedPos();
+                
+            this.tiles[targetRow][targetTile][0] = tilesetPos.x;
+            this.tiles[targetRow][targetTile][1] = tilesetPos.y;
+        }
+    }
+
+    updateSelection(e){
+        const pos = this.getGridPos(e);
+        if(pos.x >= this.map.widthInTiles * this.tileSize || pos.y >= this.map.heightInTiles * this.tileSize) return;
+        this.hover.x = pos.x;
+        this.hover.y = pos.y;
     }
 
     exportMap(){
