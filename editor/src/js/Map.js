@@ -33,6 +33,7 @@ class Map {
 
         this.handle.addEventListener('mousemove', e => {
             const pos = this.getGridPos(e);
+            if(pos.x >= this.map.widthInTiles * this.tileSize || pos.y >= this.map.heightInTiles * this.tileSize) return;
             this.hover.x = pos.x;
             this.hover.y = pos.y;
             //console.log(`x: ${this.hover.x}, y: ${this.hover.y}`)
@@ -50,15 +51,28 @@ class Map {
         });
     }
 
-    initTiles(widthInTiles, heightInTiles){
-        for(let rowNum = 0; rowNum < heightInTiles; rowNum++){
+    initTiles(){
+        for(let rowNum = 0; rowNum < this.map.heightInTiles; rowNum++){
             const newRow = [];
-            for(let tileNum = 0; tileNum < widthInTiles; tileNum++){
+            for(let tileNum = 0; tileNum < this.map.widthInTiles; tileNum++){
                 newRow.push([-1, -1]);
             }
             this.tiles.push(newRow);
         }
         console.log(this.tiles);
+    }
+
+    resizeTiles(){
+        const newTiles = [];
+        for(let rowNum = 0; rowNum < this.map.heightInTiles; rowNum++){
+            const newRow = [];
+            for(let tileNum = 0; tileNum < this.map.widthInTiles; tileNum++){
+                const targetTile = this.tiles[rowNum]?.[tileNum] || [-1,-1];
+                newRow.push([targetTile[0], targetTile[1]]);
+            }
+            newTiles.push(newRow);
+        }
+        this.tiles = newTiles;
     }
 
     exportMap(){
@@ -69,6 +83,14 @@ class Map {
     }
 
     setSize(widthInTiles, heightInTiles){
+        if(widthInTiles < 10 || heightInTiles < 10){
+            console.log('Map cannot be smaller than 10x10');
+            return;
+        }
+        if(widthInTiles > 100 || heightInTiles > 100){
+            console.log('Map cannot be bigger than 100x100');
+            return;
+        }
         if(!this.ctx || !this.handle){
             console.log('Could not set size of the map, ctx or handle is null');
             return;
@@ -80,7 +102,10 @@ class Map {
         console.log(`Map size set to ${this.handle.width}x${this.handle.height}`);
 
         if(!this.tiles.length){
-            this.initTiles(widthInTiles, heightInTiles);
+            this.initTiles();
+        }
+        else{
+            this.resizeTiles();
         }
     }
 

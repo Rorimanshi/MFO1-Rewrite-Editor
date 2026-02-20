@@ -34,14 +34,17 @@ a {
 }
 
 .map-container{
-    background-color: darkgray;
+    background-color: rgb(148, 148, 148);
     
     border: 1px solid darkmagenta;
 
-    width: 100%;
+    max-width: 100%;
     height: 100%;
 
     overflow: scroll;
+}
+#map{
+    background-color: darkgray;
 }
 
 .options-container{
