@@ -1,4 +1,4 @@
 temp1/
 .vscode
 editor/savefile.json
-localserver/build/*.exe
+*.exe
